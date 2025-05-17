@@ -1,0 +1,69 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: route-infra-workloads
+  annotations:
+    policies.kyverno.io/title: Route Infrastructure Workloads
+    policies.kyverno.io/category: Workload Distribution
+    policies.kyverno.io/subject: Deployment
+    policies.kyverno.io/description: >-
+      This policy adds node affinity, tolerations, and topology spread constraints to route
+      infrastructure workloads to infrastructure nodes with high availability.
+spec:
+  background: true
+  validationFailureAction: audit
+  rules:
+    - name: route-infra-workloads
+      match:
+        any:
+        - resources:
+            kinds:
+              - Deployment
+            namespaceSelector:
+              matchExpressions:
+                - key: workload-type
+                  operator: In
+                  values:
+                    - infrastructure
+      preconditions:
+        all:
+        - key: "{{ request.object.spec.template.metadata.labels.app || '' }}"
+          operator: NotEquals
+          value: ""
+      mutate:
+        patchStrategicMerge:
+          spec:
+            template:
+              spec:
+                +(tolerations):
+                  - key: "workload-type"
+                    operator: "Equal"
+                    value: "infrastructure"
+                    effect: "NoSchedule"
+                +(affinity):
+                  nodeAffinity:
+                    requiredDuringSchedulingIgnoredDuringExecution:
+                      nodeSelectorTerms:
+                      - matchExpressions:
+                        - key: node-type
+                          operator: In
+                          values:
+                            - infrastructure
+                  podAntiAffinity:
+                    preferredDuringSchedulingIgnoredDuringExecution:
+                    - weight: 100
+                      podAffinityTerm:
+                        labelSelector:
+                          matchExpressions:
+                          - key: app
+                            operator: In
+                            values:
+                            - "{{ request.object.spec.template.metadata.labels.app }}"
+                        topologyKey: azure.microsoft.com/hostname
+                +(topologySpreadConstraints):
+                  - maxSkew: 1
+                    topologyKey: azure.microsoft.com/zone
+                    whenUnsatisfied: ScheduleAnyway
+                    labelSelector:
+                      matchLabels:
+                        app: "{{ request.object.spec.template.metadata.labels.app }}" 

@@ -1,0 +1,41 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-instance-families
+  annotations:
+    policies.kyverno.io/title: Restrict Instance Families
+    policies.kyverno.io/category: Resource Management
+    policies.kyverno.io/subject: Provisioner
+    policies.kyverno.io/description: >-
+      This policy ensures that only supported instance families in AKS are used in
+      Karpenter provisioning requests.
+spec:
+  validationFailureAction: enforce
+  background: true
+  rules:
+    - name: validate-instance-families
+      match:
+        any:
+        - resources:
+            kinds:
+              - Provisioner
+            names:
+              - "*"
+      validate:
+        message: "Only supported AKS instance families are allowed. Unsupported instance type requested: {{ request.object.spec.requirements.instanceTypes }}"
+        deny:
+          conditions:
+            any:
+            - key: "{{ request.object.spec.requirements[?instanceTypes] }}"
+              operator: AnyNotIn
+              value:
+              - "Standard_D*"
+              - "Standard_E*"
+              - "Standard_F*"
+              - "Standard_B*"
+              - "Standard_M*"
+              - "Standard_L*"
+              - "Standard_NC*"
+              - "Standard_ND*"
+              - "Standard_NV*"
+              - "Standard_H*" 

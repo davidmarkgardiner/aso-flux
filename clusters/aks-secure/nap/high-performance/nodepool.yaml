@@ -1,0 +1,43 @@
+apiVersion: karpenter.azure.com/v1alpha2
+kind: AKSNodeClass
+metadata:
+  name: high-perf-nodes
+spec:
+  imageFamily: AzureLinux
+  osDiskSizeGB: 128
+---
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: high-perf-pool
+spec:
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    expireAfter: Never  # High-performance nodes should be stable
+  template:
+    metadata:
+      labels:
+        node-type: high-performance
+    spec:
+      nodeClassRef:
+        name: high-perf-nodes
+      taints:
+        - key: "workload-type"
+          value: "high-performance"
+          effect: "NoSchedule"
+      requirements:
+        - key: "kubernetes.io/os"
+          operator: In
+          values: ["linux"]
+        - key: "karpenter.sh/capacity-type"
+          operator: In
+          values: ["on-demand"]  # Use stable on-demand instances
+        - key: "karpenter.azure.com/sku-family"
+          operator: In
+          values: ["F"]  # F-series for compute-optimized workloads
+        - key: "karpenter.azure.com/sku-cpu"
+          operator: Gt
+          values: ["8"]  # Minimum 8 CPUs
+        - key: "karpenter.azure.com/sku-memory"
+          operator: Gt
+          values: ["16384"]  # Minimum 16GB memory 

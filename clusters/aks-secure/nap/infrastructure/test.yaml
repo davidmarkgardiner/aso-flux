@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-infra
+  labels:
+    workload-type: infrastructure
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-infra-service
+  namespace: test-infra
+spec:
+  replicas: 3  # Using 3 replicas for zone distribution
+  selector:
+    matchLabels:
+      app: infra-service
+  template:
+    metadata:
+      labels:
+        app: infra-service
+    spec:
+      containers:
+      - name: infra-service
+        image: nginx:1.25  # Using nginx as a placeholder
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 15 

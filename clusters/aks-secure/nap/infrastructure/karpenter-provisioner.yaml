@@ -1,0 +1,29 @@
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: default
+spec:
+  requirements:
+    - key: node.kubernetes.io/instance-type
+      operator: In
+      values:
+        # General Purpose
+        - Standard_D2_v3
+        - Standard_D4_v3
+        - Standard_D8_v3
+        - Standard_D16_v3
+        # Memory Optimized
+        - Standard_E2_v3
+        - Standard_E4_v3
+        - Standard_E8_v3
+        # Compute Optimized
+        - Standard_F2s_v2
+        - Standard_F4s_v2
+        - Standard_F8s_v2
+  limits:
+    resources:
+      cpu: 1000
+      memory: 1000Gi
+  providerRef:
+    name: default
+  ttlSecondsAfterEmpty: 30 
