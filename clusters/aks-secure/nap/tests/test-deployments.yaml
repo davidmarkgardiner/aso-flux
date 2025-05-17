@@ -20,6 +20,13 @@ spec:
       labels:
         app: test-infra
     spec:
+      tolerations:
+      - key: "workload-type"
+        operator: "Equal"
+        value: "infrastructure"
+        effect: "NoSchedule"
+      nodeSelector:
+        node-type: infrastructure
       containers:
       - name: nginx
         image: nginx:1.25
@@ -39,6 +46,13 @@ spec:
       labels:
         component: test-infra
     spec:
+      tolerations:
+      - key: "workload-type"
+        operator: "Equal"
+        value: "infrastructure"
+        effect: "NoSchedule"
+      nodeSelector:
+        node-type: infrastructure
       containers:
       - name: nginx
         image: nginx:1.25 
