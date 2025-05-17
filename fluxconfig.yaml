@@ -1,0 +1,34 @@
+apiVersion: kubernetesconfiguration.azure.com/v1api20230501
+kind: FluxConfiguration
+metadata:
+  name: aso-flux-config
+  namespace: default
+spec:
+  gitRepository:
+    repositoryRef:
+      branch: main
+    url: https://github.com/davidmarkgardiner/aso-flux.git
+    timeoutInSeconds: 60
+    syncIntervalInSeconds: 120
+  kustomizations:
+    apps:
+      path: ./clusters/aks-secure
+      dependsOn: ["base"]
+      timeoutInSeconds: 600
+      syncIntervalInSeconds: 120
+      prune: true
+      force: true
+    base:
+      path: ./base
+      dependsOn: []
+      timeoutInSeconds: 300
+      syncIntervalInSeconds: 60
+      prune: true
+      force: true
+  namespace: flux-system
+  owner:
+    group: containerservice.azure.com
+    kind: ManagedCluster
+    name: aks-secure
+  sourceKind: GitRepository
+  scope: cluster
