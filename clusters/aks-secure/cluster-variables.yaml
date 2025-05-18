@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-variables
+  namespace: default
+data:
+  # Cluster identity
+  SUBSCRIPTION_ID: "00000000-0000-0000-0000-000000000000"
+  RESOURCE_GROUP: "aks-dev-rg"
+  CLUSTER_NAME: "aks-dev"
+  
+  # Network configuration
+  VNET_NAME: "aks-dev-vnet"
+  SUBNET_NAME: "aks-dev-subnet"
+  SERVICE_CIDR: "10.41.0.0/16"
+  DNS_SERVICE_IP: "10.41.0.10"
+  POD_CIDR: "10.244.0.0/16"
+  
+  # Location and identity
+  LOCATION: "eastus"
+  DNS_PREFIX: "aks-dev-dns"
+  IDENTITY_NAME: "aks-dev-identity"
+  
+  # Access control
+  ADMIN_GROUP_ID: "00000000-0000-0000-0000-000000000000"
+  
+  # Compute
+  SYSTEM_NODE_VM_SIZE: "Standard_D2s_v3"
+  
+  # Tags
+  ENVIRONMENT: "dev"
+  PROJECT_NAME: "aks-project"
+  COST_CENTER: "it-dept"
+  SECURITY_LEVEL: "standard"
