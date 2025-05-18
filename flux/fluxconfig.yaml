@@ -1,0 +1,52 @@
+apiVersion: kubernetesconfiguration.azure.com/v1api20230501
+kind: FluxConfiguration
+metadata:
+  name: test-flux-config
+  namespace: default
+spec:
+  gitRepository:
+    repositoryRef:
+      branch: main
+      tag: 
+    url: https://github.com/yourusername/your-repo.git
+    timeoutInSeconds: 60
+    syncIntervalInSeconds: 120
+  kustomizations:
+    app:
+      path: ./clusters/test
+      dependsOn: []
+      timeoutInSeconds: 600
+      syncIntervalInSeconds: 120
+      prune: false
+      force: true
+    baseconfiguration:
+      path: ./base
+      dependsOn: ["napconfiguration"]
+      timeoutInSeconds: 300
+      syncIntervalInSeconds: 60
+      prune: true
+      force: true
+      postBuild:
+        substituteFrom:
+          - kind: ConfigMap
+            name: uk8s-config
+            optional: false
+    napconfiguration:
+      path: ./base
+      dependsOn: []
+      timeoutInSeconds: 300
+      syncIntervalInSeconds: 60
+      prune: true
+      force: true
+      postBuild:
+        substituteFrom:
+          - kind: ConfigMap
+            name: uk8s-config
+            optional: false
+  namespace: default
+  owner:
+    group: containerservice.azure.com
+    kind: ManagedCluster
+    name: test-aks-cluster
+  sourceKind: GitRepository
+  scope: cluster
