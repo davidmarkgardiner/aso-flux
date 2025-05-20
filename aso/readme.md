@@ -40,60 +40,49 @@ set -a; source aso/cluster.env; set +a; envsubst < aso/templated-cluster.yaml > 
 If you just want to replace in-place with `sed`, you must source the env file first.
 
 ---
+Perfect, you’re quoting the official ASO/AKS CRD schema for `privateLinkResources`. Here’s how you’d add a `privateLinkResources` block to your `ManagedCluster` spec, using all the available fields:
 
-To add `privateLinkResources` to your AKS cluster config with ASO, you need to use the `apiServerAccessProfile.privateLinkResources` field in your `ManagedCluster` spec. This is an advanced AKS feature that allows you to specify which resources are exposed via Private Link.
-
-**Example snippet:**
 ```yaml
 spec:
   apiServerAccessProfile:
     enablePrivateCluster: true
     enablePrivateClusterPublicFQDN: false
-    privateLinkResources:
-      - groupId: "management"
-        requiredMembers:
-          - "apiServer"
-      - groupId: "agent"
-        requiredMembers:
-          - "nodepool1"
-          - "nodepool2"
+  privateLinkResources:
+    - groupId: management
+      name: management
+      reference:
+        armId: /subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.ContainerService/managedClusters/${CLUSTER_NAME}/privateLinkResources/management
+      requiredMembers:
+        - apiServer
+      type: Microsoft.ContainerService/managedClusters/privateLinkResources
+    - groupId: agent
+      name: sysnpl1
+      reference:
+        armId: /subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.ContainerService/managedClusters/${CLUSTER_NAME}/privateLinkResources/agent
+      requiredMembers:
+        - sysnpl1
+      type: Microsoft.ContainerService/managedClusters/privateLinkResources
 ```
 
-- `groupId`: The Private Link resource group (e.g., `management`, `agent`).
-- `requiredMembers`: The specific resources in that group (e.g., `apiServer`, node pool names).
+**Key points:**
+- `groupId`: e.g., `management` or `agent`
+- `name`: name of the private link resource (e.g., `management`, node pool name)
+- `reference.armId`: ARM ID of the private link resource (template with your variables)
+- `requiredMembers`: array of required members (e.g., `apiServer`, node pool names)
+- `type`: always `Microsoft.ContainerService/managedClusters/privateLinkResources` for AKS
 
-**Typical usage:**
-- For AKS, the most common group is `management` with member `apiServer`.
-- For nodepools, use group `agent` and the nodepool names.
+**You can omit fields you don’t need** (they’re all optional), but this is the most explicit form.
 
-**Full example in context:**
+**Minimal example:**
 ```yaml
-apiVersion: containerservice.azure.com/v1api20240402preview
-kind: ManagedCluster
-metadata:
-  name: my-aks-cluster
-  namespace: default
-spec:
-  # ... other fields ...
-  apiServerAccessProfile:
-    enablePrivateCluster: true
-    enablePrivateClusterPublicFQDN: false
-    privateLinkResources:
-      - groupId: "management"
-        requiredMembers:
-          - "apiServer"
-      - groupId: "agent"
-        requiredMembers:
-          - "sysnpl1"
-  # ... rest of your spec ...
+privateLinkResources:
+  - groupId: management
+    requiredMembers:
+      - apiServer
+  - groupId: agent
+    requiredMembers:
+      - sysnpl1
 ```
 
-**Note:**  
-- The exact structure and support may depend on the ASO version and AKS API version.  
-- If you want to expose only the API server, just use the `management` group.
-
-**References:**  
-- [AKS Private Link docs](https://learn.microsoft.com/en-us/azure/aks/private-link)
-- [AKS API reference](https://learn.microsoft.com/en-us/azure/templates/microsoft.containerservice/managedclusters?pivots=deployment-language-arm-template#apiserveraccessprofile-object)
-
-Let me know if you want a patch for your current YAML.
+**Plug this under your `spec:` in the cluster manifest.**  
+Let me know if you want a patch for your actual YAML.
