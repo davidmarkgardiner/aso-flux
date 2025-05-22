@@ -1,0 +1,163 @@
+apiVersion: containerservice.azure.com/v1api20240402preview
+kind: ManagedCluster
+metadata:
+  name: ${CLUSTER_NAME}
+  namespace: aso
+spec:
+  networkProfile:
+    # Network configuration for subnet reference
+    subnetReference:
+      armId: /sxxxcriptions/${SxxxCRIPTION_ID}/resourceGroups/${VNET_NAME_RG}/providers/Microsoft.Network/virtualNetworks/${VNET_NAME}/subnets/${SUBNET_NAME}
+  location: ${LOCATION}
+  owner:
+    name: ${RESOURCE_GROUP}
+  dnsPrefix: ${DNS_PREFIX}
+  kubernetesVersion: "1.31"
+  linuxProfile:
+    adminUsername: localadmin
+    ssh:
+      publicKeys:
+        - keyData: ssh-rsa AAA...
+  # Node provisioning with auto mode (NAP)
+  nodeProvisioningProfile:
+    mode: Auto
+  # Identity Configuration
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+    - reference:
+        armId: /sxxxcriptions/${SxxxCRIPTION_ID}/resourceGroups/${IDENTITY_RG}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${IDENTITY_NAME}
+  # AAD and RBAC Configuration
+  aadProfile:
+    enableAzureRBAC: true
+    managed: true
+    adminGroupObjectIDs:
+    - "${ADMIN_GROUP_ID}"
+  enableRBAC: true
+  disableLocalAccounts: true
+  # Network Profile
+  networkProfile:
+    networkPlugin: azure
+    networkPluginMode: overlay
+    networkPolicy: cilium
+    networkDataplane: cilium
+    serviceCidr: ${SERVICE_CIDR}
+    dnsServiceIP: ${DNS_SERVICE_IP}
+    podCidr: ${POD_CIDR}
+    ipFamilies: ["IPv4"]
+    loadBalancerSku: standard
+  # API Server Access
+  apiServerAccessProfile:
+    enablePrivateCluster: true
+    enablePrivateClusterPublicFQDN: true
+  agentPoolProfiles:
+  - name: systempool
+    mode: System
+    count: 1
+    enableAutoScaling: false
+    vmSize: ${SYSTEM_NODE_VM_SIZE}
+    availabilityZones: ["1"]
+    osDiskType: Managed
+    osDiskSizeGB: 128
+    osType: Linux
+    osSKU: AzureLinux
+    maxPods: 30
+    securityProfile:
+      enableSecureBoot: true
+      enableVTPM: true
+      sshAccess: Disabled
+  identityProfile:
+    kubeletidentity:
+      clientId: ${RUNTIME_IDENTITY_CLIENT_ID}
+      objectId: ${RUNTIME_IDENTITY_OBJECT_ID}
+      resourceReference:
+        armId: ${RUNTIME_IDENTITY_RESOURCE_ID}
+  # Auto Upgrade Configuration
+  autoUpgradeProfile:
+    upgradeChannel: stable
+    nodeOSUpgradeChannel: NodeImage
+  # Security Profile
+  securityProfile:
+    defender:
+      logAnalyticsWorkspaceResourceReference:
+        armId: ${LOGANALYTICSWORKSPACEIDDEFENDER}
+      securityMonitoring:
+        enabled: true
+    workloadIdentity:
+      enabled: true
+    imageCleaner:
+      enabled: true
+      intervalHours: 48
+  # Storage Profile
+  storageProfile:
+    diskCSIDriver:
+      enabled: true
+    fileCSIDriver:
+      enabled: true
+    snapshotController:
+      enabled: true
+  # Addon Profiles
+  addonProfiles:
+    azureKeyvaultSecretsProvider:
+      enabled: true
+      config:
+        enableSecretRotation: "true"
+        rotationPollInterval: "30m"
+    azurepolicy:
+      enabled: true
+      config:
+        version: "v2"
+  # Monitoring and Metrics
+  azureMonitorProfile:
+    metrics:
+      enabled: true
+  # Cluster SKU and Support
+  sku:
+    name: Base
+    tier: Standard
+  supportPlan: KubernetesOfficial
+  # Workload Auto Scaler with KEDA
+  workloadAutoScalerProfile:
+    keda:
+      enabled: true
+  # OIDC Issuer - Required for workload identity
+  oidcIssuerProfile:
+    enabled: true
+  serviceMeshProfile:
+    mode: Istio
+    istio:
+      components:
+        ingressGateways:
+          - enabled: true
+            mode: Internal
+      revisions:
+        - ${ISTIO_REVISION}
+  podIdentityProfile:
+    enabled: false
+    userAssignedIdentityExceptions:
+        - name: k8s-control-plane-exception
+          namespace: kube-system
+          podLabels:
+            kubernetes.azure.com/managedby: aks
+        - name: xxx-control-plane-exception
+          namespace: xxx-system
+          podLabels:
+            kubernetes.azure.com/managedby: aks
+  # Resource group for node resources
+  nodeResourceGroup: MC_${RESOURCE_GROUP}_${CLUSTER_NAME}_${LOCATION}
+  # Service Principal Profile
+  servicePrincipalProfile:
+    clientId: msi
+  # Tags
+  tags:
+    environment: ${ENVIRONMENT}
+    project: ${PROJECT_NAME}
+    costCenter: ${COST_CENTER}
+    securityLevel: ${SECURITY_LEVEL}
+    managedBy: aso    
+    billingReference: ${BILLING_REF}
+    opEnvironment: ${OP_ENV}
+    cmdbReference: ${CMDB_REF}
+    Owner: ${OWNER}
+    Status: ${STATUS}
+    Team: ${TEAM}
