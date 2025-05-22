@@ -6,9 +6,9 @@ This directory contains the configuration for setting up managed identities with
 - Cert Manager
 
 ## Files
-- `managedidentity.yaml`: Defines the User Assigned Managed Identities
+- `managedidentity.yaml`: Defines the User Assigned Managed Identities (ASO will create these in Azure)
 - `federated.yaml`: Defines the federated credentials for workload identity
-- `configmap.yaml`: Contains the identity details for all services
+- `configmap.yaml`: Will be automatically populated by ASO with identity details
 - `serviceaccounts.yaml`: Defines the service accounts for each service
 
 ## Setup Process
@@ -17,26 +17,34 @@ This directory contains the configuration for setting up managed identities with
    ```bash
    kubectl apply -f managedidentity.yaml
    ```
-   This creates three User Assigned Managed Identities in Azure:
+   This creates three User Assigned Managed Identities in Azure via ASO:
    - `eso-identity` for External Secrets Operator
    - `external-dns-identity` for External DNS
    - `cert-manager-identity` for Cert Manager
 
-2. **Get Identity Details**
-   After the identities are created, get their details:
+   ASO will automatically create and populate the ConfigMaps with the identity details.
+
+2. **Verify Identity Creation**
    ```bash
-   # Get ESO identity details
-   az identity show --name eso-identity --resource-group aso-sample-rg --query '{clientId:clientId,principalId:principalId,tenantId:tenantId}' -o json > eso-identity.json
+   # Check if identities are created
+   kubectl get userassignedidentity -n default
 
-   # Get External DNS identity details
-   az identity show --name external-dns-identity --resource-group aso-sample-rg --query '{clientId:clientId,principalId:principalId,tenantId:tenantId}' -o json > external-dns-identity.json
-
-   # Get Cert Manager identity details
-   az identity show --name cert-manager-identity --resource-group aso-sample-rg --query '{clientId:clientId,principalId:principalId,tenantId:tenantId}' -o json > cert-manager-identity.json
+   # Check if ConfigMaps are populated
+   kubectl get configmap eso-identity-cm -n default -o yaml
+   kubectl get configmap external-dns-identity-cm -n default -o yaml
+   kubectl get configmap cert-manager-identity-cm -n default -o yaml
    ```
 
-3. **Update ConfigMaps**
-   Fill in the values in `configmap.yaml` with the details from the JSON files.
+3. **Update Service Accounts**
+   After the ConfigMaps are populated, update `serviceaccounts.yaml` with the client IDs:
+   ```bash
+   # Get the client IDs
+   ESO_CLIENT_ID=$(kubectl get configmap eso-identity-cm -n default -o jsonpath='{.data.clientId}')
+   DNS_CLIENT_ID=$(kubectl get configmap external-dns-identity-cm -n default -o jsonpath='{.data.clientId}')
+   CERT_CLIENT_ID=$(kubectl get configmap cert-manager-identity-cm -n default -o jsonpath='{.data.clientId}')
+
+   # Update serviceaccounts.yaml with these values
+   ```
 
 4. **Create Namespaces and Service Accounts**
    ```bash
@@ -76,20 +84,25 @@ This directory contains the configuration for setting up managed identities with
    - Key Vault Certificates Officer on target key vaults
    - Key Vault Secrets Officer on target key vaults
 
-Assign these roles using:
+Assign these roles using the principal IDs from the ConfigMaps:
 ```bash
+# Get principal IDs from ConfigMaps
+ESO_PRINCIPAL_ID=$(kubectl get configmap eso-identity-cm -n default -o jsonpath='{.data.principalId}')
+DNS_PRINCIPAL_ID=$(kubectl get configmap external-dns-identity-cm -n default -o jsonpath='{.data.principalId}')
+CERT_PRINCIPAL_ID=$(kubectl get configmap cert-manager-identity-cm -n default -o jsonpath='{.data.principalId}')
+
 # For ESO
-az role assignment create --role "Key Vault Secrets User" --assignee-object-id <eso-identity-principal-id> --scope <key-vault-resource-id>
-az role assignment create --role "Key Vault Reader" --assignee-object-id <eso-identity-principal-id> --scope <key-vault-resource-id>
+az role assignment create --role "Key Vault Secrets User" --assignee-object-id $ESO_PRINCIPAL_ID --scope <key-vault-resource-id>
+az role assignment create --role "Key Vault Reader" --assignee-object-id $ESO_PRINCIPAL_ID --scope <key-vault-resource-id>
 
 # For External DNS
-az role assignment create --role "DNS Zone Contributor" --assignee-object-id <external-dns-identity-principal-id> --scope <dns-zone-resource-id>
-az role assignment create --role "Reader" --assignee-object-id <external-dns-identity-principal-id> --scope <resource-group-id>
+az role assignment create --role "DNS Zone Contributor" --assignee-object-id $DNS_PRINCIPAL_ID --scope <dns-zone-resource-id>
+az role assignment create --role "Reader" --assignee-object-id $DNS_PRINCIPAL_ID --scope <resource-group-id>
 
 # For Cert Manager
-az role assignment create --role "DNS Zone Contributor" --assignee-object-id <cert-manager-identity-principal-id> --scope <dns-zone-resource-id>
-az role assignment create --role "Key Vault Certificates Officer" --assignee-object-id <cert-manager-identity-principal-id> --scope <key-vault-resource-id>
-az role assignment create --role "Key Vault Secrets Officer" --assignee-object-id <cert-manager-identity-principal-id> --scope <key-vault-resource-id>
+az role assignment create --role "DNS Zone Contributor" --assignee-object-id $CERT_PRINCIPAL_ID --scope <dns-zone-resource-id>
+az role assignment create --role "Key Vault Certificates Officer" --assignee-object-id $CERT_PRINCIPAL_ID --scope <key-vault-resource-id>
+az role assignment create --role "Key Vault Secrets Officer" --assignee-object-id $CERT_PRINCIPAL_ID --scope <key-vault-resource-id>
 ```
 
 ## Troubleshooting
