@@ -1,133 +1,114 @@
-# Azure Managed Identity Setup with ASO
+# Azure Managed Identities Setup for Kubernetes Services
 
-This directory contains the configuration for setting up a managed identity with federated credentials for workload identity in AKS.
+This directory contains the configuration for setting up managed identities with federated credentials for:
+- External Secrets Operator (ESO)
+- External DNS
+- Cert Manager
 
 ## Files
-- `managedidentity.yaml`: Defines the User Assigned Managed Identity
-- `federated.yaml`: Defines the federated credential for workload identity
-- `configmap.yaml`: Contains the identity details (needs to be created)
-- `secret.yaml`: Contains sensitive identity details (needs to be created)
+- `managedidentity.yaml`: Defines the User Assigned Managed Identities
+- `federated.yaml`: Defines the federated credentials for workload identity
+- `configmap.yaml`: Contains the identity details for all services
+- `serviceaccounts.yaml`: Defines the service accounts for each service
 
 ## Setup Process
 
-1. **Create the Managed Identity**
+1. **Create the Managed Identities**
    ```bash
    kubectl apply -f managedidentity.yaml
    ```
-   This creates a User Assigned Managed Identity in Azure. The identity details (clientId, principalId, tenantId) will be stored in a ConfigMap and Secret.
+   This creates three User Assigned Managed Identities in Azure:
+   - `eso-identity` for External Secrets Operator
+   - `external-dns-identity` for External DNS
+   - `cert-manager-identity` for Cert Manager
 
 2. **Get Identity Details**
-   After the identity is created, get its details:
+   After the identities are created, get their details:
    ```bash
-   # Get the identity details from Azure
-   az identity show --name sampleuserassignedidentity --resource-group aso-sample-rg --query '{clientId:clientId,principalId:principalId,tenantId:tenantId}' -o json
+   # Get ESO identity details
+   az identity show --name eso-identity --resource-group aso-sample-rg --query '{clientId:clientId,principalId:principalId,tenantId:tenantId}' -o json > eso-identity.json
+
+   # Get External DNS identity details
+   az identity show --name external-dns-identity --resource-group aso-sample-rg --query '{clientId:clientId,principalId:principalId,tenantId:tenantId}' -o json > external-dns-identity.json
+
+   # Get Cert Manager identity details
+   az identity show --name cert-manager-identity --resource-group aso-sample-rg --query '{clientId:clientId,principalId:principalId,tenantId:tenantId}' -o json > cert-manager-identity.json
    ```
 
-3. **Create ConfigMap and Secret**
-   Create `configmap.yaml`:
-   ```yaml
-   apiVersion: v1
-   kind: ConfigMap
-   metadata:
-     name: umi-cm
-     namespace: default
-   data:
-     clientId: "<client-id-from-azure>"
-     principalId: "<principal-id-from-azure>"
-     tenantId: "<tenant-id-from-azure>"
+3. **Update ConfigMaps**
+   Fill in the values in `configmap.yaml` with the details from the JSON files.
+
+4. **Create Namespaces and Service Accounts**
+   ```bash
+   # Create namespaces
+   kubectl create namespace external-secrets
+   kubectl create namespace external-dns
+   kubectl create namespace cert-manager
+
+   # Apply service accounts
+   kubectl apply -f serviceaccounts.yaml
    ```
 
-   Create `secret.yaml`:
-   ```yaml
-   apiVersion: v1
-   kind: Secret
-   metadata:
-     name: umi-secret
-     namespace: default
-   type: Opaque
-   stringData:
-     clientId: "<client-id-from-azure>"
-     principalId: "<principal-id-from-azure>"
-     tenantId: "<tenant-id-from-azure>"
-   ```
+5. **Update Federated Credentials**
+   - Get your cluster's OIDC issuer URL:
+     ```bash
+     az aks show -n <cluster-name> -g <resource-group> --query "oidcIssuerProfile.issuerUrl" -o tsv
+     ```
+   - Update the `issuer` URL in `federated.yaml` for all three federated credentials
 
-4. **Create Federated Credential**
+6. **Create Federated Credentials**
    ```bash
    kubectl apply -f federated.yaml
    ```
-   This creates a federated credential that allows the Kubernetes service account to authenticate as the managed identity.
 
-## Important Notes
+## Required Azure RBAC Permissions
 
-1. **OIDC Issuer URL**
-   - The `issuer` in `federated.yaml` must match your AKS cluster's OIDC issuer URL
-   - Get it with: `az aks show -n <cluster-name> -g <resource-group> --query "oidcIssuerProfile.issuerUrl" -o tsv`
-   - Update the URL in `federated.yaml` accordingly
+1. **External Secrets Operator Identity**
+   - Key Vault Secrets User on target key vaults
+   - Key Vault Reader on target key vaults
 
-2. **Service Account**
-   - The `subject` in `federated.yaml` must match your service account
-   - Format: `system:serviceaccount:<namespace>:<serviceaccount-name>`
-   - Create the service account if it doesn't exist:
-     ```yaml
-     apiVersion: v1
-     kind: ServiceAccount
-     metadata:
-       name: default
-       namespace: default
-       annotations:
-         azure.workload.identity/client-id: "<client-id-from-azure>"
-     ```
+2. **External DNS Identity**
+   - DNS Zone Contributor on target DNS zones
+   - Reader on resource groups containing DNS zones
 
-3. **Audience**
-   - For workload identity, always use `api://AzureADTokenExchange`
+3. **Cert Manager Identity**
+   - DNS Zone Contributor on target DNS zones
+   - Key Vault Certificates Officer on target key vaults
+   - Key Vault Secrets Officer on target key vaults
 
-## Usage
+Assign these roles using:
+```bash
+# For ESO
+az role assignment create --role "Key Vault Secrets User" --assignee-object-id <eso-identity-principal-id> --scope <key-vault-resource-id>
+az role assignment create --role "Key Vault Reader" --assignee-object-id <eso-identity-principal-id> --scope <key-vault-resource-id>
 
-To use this identity in a pod:
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: my-pod
-  namespace: default
-spec:
-  serviceAccountName: default  # The service account with workload identity
-  containers:
-  - name: my-container
-    image: my-image
-    env:
-    - name: AZURE_CLIENT_ID
-      valueFrom:
-        configMapKeyRef:
-          name: umi-cm
-          key: clientId
-    - name: AZURE_TENANT_ID
-      valueFrom:
-        configMapKeyRef:
-          name: umi-cm
-          key: tenantId
+# For External DNS
+az role assignment create --role "DNS Zone Contributor" --assignee-object-id <external-dns-identity-principal-id> --scope <dns-zone-resource-id>
+az role assignment create --role "Reader" --assignee-object-id <external-dns-identity-principal-id> --scope <resource-group-id>
+
+# For Cert Manager
+az role assignment create --role "DNS Zone Contributor" --assignee-object-id <cert-manager-identity-principal-id> --scope <dns-zone-resource-id>
+az role assignment create --role "Key Vault Certificates Officer" --assignee-object-id <cert-manager-identity-principal-id> --scope <key-vault-resource-id>
+az role assignment create --role "Key Vault Secrets Officer" --assignee-object-id <cert-manager-identity-principal-id> --scope <key-vault-resource-id>
 ```
 
 ## Troubleshooting
 
 1. **Check Identity Status**
    ```bash
-   kubectl get userassignedidentity sampleuserassignedidentity -n default
-   kubectl get federatedidentitycredential aso-fic -n default
+   kubectl get userassignedidentity -n default
+   kubectl get federatedidentitycredential -n default
    ```
 
-2. **Verify Service Account**
+2. **Verify Service Accounts**
    ```bash
-   kubectl get serviceaccount default -n default -o yaml
+   kubectl get serviceaccount -n external-secrets external-secrets -o yaml
+   kubectl get serviceaccount -n external-dns external-dns -o yaml
+   kubectl get serviceaccount -n cert-manager cert-manager -o yaml
    ```
 
-3. **Check Pod Identity**
+3. **Test Authentication**
    ```bash
-   kubectl describe pod <pod-name> -n default
-   ```
-
-4. **Test Authentication**
-   ```bash
-   # Inside the pod
+   # Inside a pod using any of the service accounts
    curl -H "Authorization: Bearer $(curl -s 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/' -H Metadata:true | jq -r .access_token)" https://management.azure.com/subscriptions/<subscription-id>?api-version=2020-01-01
    ``` 
