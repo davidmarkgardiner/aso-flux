@@ -32,3 +32,63 @@ spec:
     name: aks-secure
   sourceKind: GitRepository
   scope: cluster
+---
+apiVersion: kubernetesconfiguration.azure.com/v1api20230501
+kind: FluxConfiguration
+metadata:
+  name: aso-flux-config
+  namespace: default
+spec:
+  azureName: aso-flux-config
+  # Git repository configuration
+  gitRepository:
+    repositoryRef:
+      branch: main
+    url: https://github.com/davidmarkgardiner/aso-flux.git
+    timeoutInSeconds: 60
+    syncIntervalInSeconds: 120
+    # For private repo, add these:
+    httpsUser: git-credentials
+    httpsKey: git-credentials
+  # Kustomization configurations
+  kustomizations:
+    apps:
+      path: ./clusters/aks-secure
+      dependsOn: ["base"]
+      timeoutInSeconds: 600
+      syncIntervalInSeconds: 120
+      prune: true
+      force: true
+      wait: true  # Wait for reconciliation
+      retryInterval: 30s  # Retry interval for failed reconciliations
+    base:
+      path: ./base
+      dependsOn: []
+      timeoutInSeconds: 300
+      syncIntervalInSeconds: 60
+      prune: true
+      force: true
+      wait: true
+      retryInterval: 30s
+  # Installation namespace
+  namespace: flux-system
+  # Owner reference (required)
+  owner:
+    group: containerservice.azure.com
+    kind: ManagedCluster
+    name: aks-secure
+  # Source configuration
+  sourceKind: GitRepository
+  scope: cluster
+  # Reconciliation settings
+  reconciliationWaitDuration: PT10M  # Wait up to 10 minutes for reconciliation
+  waitForReconciliation: true  # Wait for kustomizations to reconcile
+  # Optional: Suspend reconciliation if needed
+  suspend: false
+  # Optional: Protected settings (for sensitive data)
+  configurationProtectedSettings:
+    # Add any sensitive configuration here
+    # These will be stored securely in Azure
+    gitCredentials: |
+      username: ${GIT_USERNAME}
+      password: ${GIT_PAT}
