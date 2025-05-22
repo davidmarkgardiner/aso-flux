@@ -1,0 +1,70 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aso-flux-config-role
+rules:
+# Kubernetes Configuration permissions
+- apiGroups: ["kubernetesconfiguration.azure.com"]
+  resources: ["fluxconfigurations", "kubernetesconfigurations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# AKS permissions
+- apiGroups: ["containerservice.azure.com"]
+  resources: ["managedclusters", "managedclusters/agentpools", "managedclusters/privateendpointconnections"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Identity permissions
+- apiGroups: ["managedidentity.azure.com"]
+  resources: ["userassignedidentities", "federatedidentitycredentials"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Key Vault permissions
+- apiGroups: ["keyvault.azure.com"]
+  resources: ["vaults", "vaults/secrets", "vaults/keys", "vaults/certificates"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Network permissions
+- apiGroups: ["network.azure.com"]
+  resources: ["virtualnetworks", "subnets", "privatelinkservices", "privatendpoints"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Resource Group permissions
+- apiGroups: ["resources.azure.com"]
+  resources: ["resourcegroups"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Storage permissions
+- apiGroups: ["storage.azure.com"]
+  resources: ["storageaccounts", "storageaccounts/blobservices", "storageaccounts/fileservices"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Event Hub permissions
+- apiGroups: ["eventhub.azure.com"]
+  resources: ["namespaces", "namespaces/eventhubs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Monitor permissions
+- apiGroups: ["insights.azure.com"]
+  resources: ["workspaces", "workspaces/datasources"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# DNS permissions
+- apiGroups: ["network.azure.com"]
+  resources: ["dnszones", "dnszones/a", "dnszones/aaaa", "dnszones/cname", "dnszones/mx", "dnszones/ptr", "dnszones/srv", "dnszones/txt"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# RBAC permissions
+- apiGroups: ["authorization.azure.com"]
+  resources: ["roleassignments", "roledefinitions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Service Bus permissions
+- apiGroups: ["servicebus.azure.com"]
+  resources: ["namespaces", "namespaces/queues", "namespaces/topics"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Container Registry permissions
+- apiGroups: ["containerregistry.azure.com"]
+  resources: ["registries", "registries/replications", "registries/webhooks"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aso-flux-config-binding
+subjects:
+- kind: ServiceAccount
+  name: azureserviceoperator-default
+  namespace: aso
+roleRef:
+  kind: ClusterRole
+  name: aso-flux-config-role
+  apiGroup: rbac.authorization.k8s.io
