@@ -1,0 +1,39 @@
+apiVersion: containerservice.azure.com/v1api20240402preview
+kind: ManagedCluster
+metadata:
+  name: cluster
+spec:
+  networkProfile:
+    subnetReference: 
+      armId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/aks-ppe-rg/providers/Microsoft.Network/virtualNetworks/aks-ppe-vnet/subnets/aks-ppe-subnet
+    serviceCidr: 10.42.0.0/16
+    dnsServiceIP: 10.42.0.10
+    podCidr: 10.245.0.0/16
+  
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+    - reference:
+        armId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/aks-ppe-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/aks-ppe-identity
+  
+  aadProfile:
+    adminGroupObjectIDs:
+    - "00000000-0000-0000-0000-000000000000"
+  
+  agentPoolProfiles:
+  - name: sysnpl1
+    vmSize: Standard_D4s_v3
+    count: 2
+  
+  nodeResourceGroup: MC_aks-ppe-rg_aks-ppe_eastus
+  
+  sku:
+    name: Base
+    tier: Standard
+  
+  tags:
+    environment: ppe
+    project: aks-project
+    costCenter: it-dept
+    securityLevel: elevated
+    managedBy: aso

@@ -1,0 +1,169 @@
+stages:
+  - validate
+  - build
+  - deploy
+
+variables:
+  KUSTOMIZE_VERSION: "5.3.0"
+  KUBECTL_VERSION: "1.31.0"
+  FLUX_VERSION: "2.2.3"
+
+.install_tools: &install_tools
+  - wget -O kustomize.tar.gz "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+  - tar -xzf kustomize.tar.gz
+  - chmod +x kustomize
+  - mv kustomize /usr/local/bin/
+  - wget -O kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+  - chmod +x kubectl
+  - mv kubectl /usr/local/bin/
+  - wget -O flux.tar.gz "https://github.com/fluxcd/flux2/releases/download/v${FLUX_VERSION}/flux_${FLUX_VERSION}_linux_amd64.tar.gz"
+  - tar -xzf flux.tar.gz
+  - chmod +x flux
+  - mv flux /usr/local/bin/
+
+lint_yaml:
+  stage: validate
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache yamllint
+  script:
+    - yamllint -d relaxed .
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+validate_kustomize:
+  stage: validate
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache wget
+    - *install_tools
+  script:
+    - echo "Validating base configuration..."
+    - kustomize build base/ > /tmp/base-output.yaml
+    - kubectl --dry-run=client apply -f /tmp/base-output.yaml
+    - echo "Validating dev overlay..."
+    - kustomize build overlays/dev/ > /tmp/dev-output.yaml
+    - kubectl --dry-run=client apply -f /tmp/dev-output.yaml
+    - echo "Validating ppe overlay..."
+    - kustomize build overlays/ppe/ > /tmp/ppe-output.yaml
+    - kubectl --dry-run=client apply -f /tmp/ppe-output.yaml
+    - echo "Validating prd overlay..."
+    - kustomize build overlays/prd/ > /tmp/prd-output.yaml
+    - kubectl --dry-run=client apply -f /tmp/prd-output.yaml
+  artifacts:
+    paths:
+      - /tmp/*-output.yaml
+    expire_in: 1 hour
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+validate_flux:
+  stage: validate
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache wget
+    - *install_tools
+  script:
+    - echo "Validating Flux configurations..."
+    - flux validate --path=flux/clusters/
+    - flux validate --path=flux/environments/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+security_scan:
+  stage: validate
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git grep
+  script:
+    - echo "Scanning for sensitive information..."
+    - |
+      if grep -r "password\|secret\|key\|token" --include="*.yaml" --include="*.yml" .; then
+        echo "WARNING: Potential sensitive information found"
+        exit 1
+      fi
+    - echo "No sensitive information detected"
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+build_manifests:
+  stage: build
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache wget
+    - *install_tools
+  script:
+    - mkdir -p build/
+    - echo "Building dev manifests..."
+    - kustomize build overlays/dev/ > build/dev-manifests.yaml
+    - echo "Building ppe manifests..."
+    - kustomize build overlays/ppe/ > build/ppe-manifests.yaml
+    - echo "Building prd manifests..."
+    - kustomize build overlays/prd/ > build/prd-manifests.yaml
+    - echo "Building flux manifests..."
+    - kustomize build flux/environments/ > build/flux-manifests.yaml
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 day
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+deploy_dev:
+  stage: deploy
+  image: alpine:latest
+  environment:
+    name: development
+  before_script:
+    - apk add --no-cache wget
+    - *install_tools
+  script:
+    - echo "Deploying to development environment..."
+    - echo "This would apply the dev manifests to the target cluster"
+    - echo "kubectl apply -f build/dev-manifests.yaml"
+  dependencies:
+    - build_manifests
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  when: manual
+
+deploy_ppe:
+  stage: deploy
+  image: alpine:latest
+  environment:
+    name: pre-production
+  before_script:
+    - apk add --no-cache wget
+    - *install_tools
+  script:
+    - echo "Deploying to pre-production environment..."
+    - echo "This would apply the ppe manifests to the target cluster"
+    - echo "kubectl apply -f build/ppe-manifests.yaml"
+  dependencies:
+    - build_manifests
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  when: manual
+
+deploy_prd:
+  stage: deploy
+  image: alpine:latest
+  environment:
+    name: production
+  before_script:
+    - apk add --no-cache wget
+    - *install_tools
+  script:
+    - echo "Deploying to production environment..."
+    - echo "This would apply the prd manifests to the target cluster"
+    - echo "kubectl apply -f build/prd-manifests.yaml"
+  dependencies:
+    - build_manifests
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  when: manual

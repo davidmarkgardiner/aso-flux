@@ -1,0 +1,105 @@
+apiVersion: containerservice.azure.com/v1api20240402preview
+kind: ManagedCluster
+metadata:
+  name: cluster
+  namespace: default
+spec:
+  kubernetesVersion: "1.31"
+  
+  # Node provisioning with auto mode (NAP)
+  nodeProvisioningProfile:
+    mode: Auto
+  
+  # AAD and RBAC Configuration
+  aadProfile:
+    enableAzureRBAC: true
+    managed: true
+  enableRBAC: true
+  disableLocalAccounts: true
+  
+  # Network Profile
+  networkProfile:
+    networkPlugin: azure
+    networkPluginMode: overlay
+    networkPolicy: cilium
+    networkDataplane: cilium
+    ipFamilies: ["IPv4"]
+    loadBalancerSku: standard
+  
+  # API Server Access
+  apiServerAccessProfile:
+    enablePrivateCluster: false
+    enablePrivateClusterPublicFQDN: false
+  
+  agentPoolProfiles:
+  - name: sysnpl1
+    mode: System
+    count: 1
+    enableAutoScaling: false
+    availabilityZones: ["1"]
+    osDiskType: Managed
+    osDiskSizeGB: 128
+    osType: Linux
+    osSKU: AzureLinux
+    maxPods: 30
+  
+  # Auto Upgrade Configuration
+  autoUpgradeProfile:
+    upgradeChannel: stable
+    nodeOSUpgradeChannel: NodeImage
+  
+  # Security Profile
+  securityProfile:
+    defender:
+      securityMonitoring:
+        enabled: false
+    workloadIdentity:
+      enabled: true
+    imageCleaner:
+      enabled: true
+      intervalHours: 48
+  
+  # Storage Profile
+  storageProfile:
+    diskCSIDriver:
+      enabled: true
+    fileCSIDriver:
+      enabled: true
+    snapshotController:
+      enabled: true
+  
+  # Addon Profiles
+  addonProfiles:
+    azureKeyvaultSecretsProvider:
+      enabled: true
+      config:
+        enableSecretRotation: "true"
+        rotationPollInterval: "30m"
+    azurepolicy:
+      enabled: true
+      config:
+        version: "v2"
+  
+  # Monitoring and Metrics
+  azureMonitorProfile:
+    metrics:
+      enabled: true
+  
+  # Cluster SKU and Support
+  sku:
+    name: Base
+    tier: Free
+  supportPlan: KubernetesOfficial
+  
+  # Workload Auto Scaler with KEDA
+  workloadAutoScalerProfile:
+    keda:
+      enabled: true
+  
+  # OIDC Issuer - Required for workload identity
+  oidcIssuerProfile:
+    enabled: true
+  
+  # Service Principal Profile
+  servicePrincipalProfile:
+    clientId: msi

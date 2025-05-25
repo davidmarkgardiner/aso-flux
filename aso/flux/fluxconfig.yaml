@@ -4,41 +4,6 @@ metadata:
   name: aso-flux-config
   namespace: default
 spec:
-  gitRepository:
-    repositoryRef:
-      branch: main
-    url: https://github.com/davidmarkgardiner/aso-flux.git
-    timeoutInSeconds: 60
-    syncIntervalInSeconds: 120
-  kustomizations:
-    apps:
-      path: ./clusters/aks-secure
-      dependsOn: ["base"]
-      timeoutInSeconds: 600
-      syncIntervalInSeconds: 120
-      prune: true
-      force: true
-    base:
-      path: ./base
-      dependsOn: []
-      timeoutInSeconds: 300
-      syncIntervalInSeconds: 60
-      prune: true
-      force: true
-  namespace: flux-system
-  owner:
-    group: containerservice.azure.com
-    kind: ManagedCluster
-    name: aks-secure
-  sourceKind: GitRepository
-  scope: cluster
----
-apiVersion: kubernetesconfiguration.azure.com/v1api20230501
-kind: FluxConfiguration
-metadata:
-  name: aso-flux-config
-  namespace: default
-spec:
   azureName: aso-flux-config
   # Git repository configuration
   gitRepository:
@@ -47,9 +12,6 @@ spec:
     url: https://github.com/davidmarkgardiner/aso-flux.git
     timeoutInSeconds: 60
     syncIntervalInSeconds: 120
-    # For private repo, add these:
-    httpsUser: git-credentials
-    httpsKey: git-credentials
   # Kustomization configurations
   kustomizations:
     apps:
@@ -60,7 +22,6 @@ spec:
       prune: true
       force: true
       wait: true  # Wait for reconciliation
-      retryInterval: 30s  # Retry interval for failed reconciliations
     base:
       path: ./base
       dependsOn: []
@@ -69,7 +30,6 @@ spec:
       prune: true
       force: true
       wait: true
-      retryInterval: 30s
   # Installation namespace
   namespace: flux-system
   # Owner reference (required)
@@ -87,8 +47,5 @@ spec:
   suspend: false
   # Optional: Protected settings (for sensitive data)
   configurationProtectedSettings:
-    # Add any sensitive configuration here
-    # These will be stored securely in Azure
-    gitCredentials: |
-      username: ${GIT_USERNAME}
-      password: ${GIT_PAT}
+    name: flux-git-credentials
+    key: git-auth

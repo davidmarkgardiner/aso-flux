@@ -1,0 +1,78 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: aso-prd
+
+namePrefix: prd-
+nameSuffix: ""
+
+commonLabels:
+  environment: prd
+  app.kubernetes.io/environment: prd
+
+resources:
+  - ../../base
+
+configMapGenerator:
+  - name: cluster-variables
+    namespace: default
+    literals:
+      - SUBSCRIPTION_ID=00000000-0000-0000-0000-000000000000
+      - RESOURCE_GROUP=aks-prd-rg
+      - CLUSTER_NAME=aks-prd
+      - VNET_NAME=aks-prd-vnet
+      - SUBNET_NAME=aks-prd-subnet
+      - SERVICE_CIDR=10.43.0.0/16
+      - DNS_SERVICE_IP=10.43.0.10
+      - POD_CIDR=10.246.0.0/16
+      - LOCATION=eastus
+      - DNS_PREFIX=aks-prd-dns
+      - IDENTITY_NAME=aks-prd-identity
+      - ADMIN_GROUP_ID=00000000-0000-0000-0000-000000000000
+      - SYSTEM_NODE_VM_SIZE=Standard_D8s_v3
+      - ENVIRONMENT=prd
+      - PROJECT_NAME=aks-project
+      - COST_CENTER=it-dept
+      - SECURITY_LEVEL=high
+
+patchesStrategicMerge:
+  - cluster-patch.yaml
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-variables
+      fieldPath: data.CLUSTER_NAME
+    targets:
+      - select:
+          kind: ManagedCluster
+        fieldPaths:
+          - metadata.name
+  - source:
+      kind: ConfigMap
+      name: cluster-variables
+      fieldPath: data.RESOURCE_GROUP
+    targets:
+      - select:
+          kind: ManagedCluster
+        fieldPaths:
+          - spec.owner.name
+  - source:
+      kind: ConfigMap
+      name: cluster-variables
+      fieldPath: data.LOCATION
+    targets:
+      - select:
+          kind: ManagedCluster
+        fieldPaths:
+          - spec.location
+  - source:
+      kind: ConfigMap
+      name: cluster-variables
+      fieldPath: data.DNS_PREFIX
+    targets:
+      - select:
+          kind: ManagedCluster
+        fieldPaths:
+          - spec.dnsPrefix
