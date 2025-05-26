@@ -1,0 +1,137 @@
+apiVersion: containerservice.azure.com/v1api20240402preview
+kind: ManagedCluster
+metadata:
+  name: aks-secure
+  namespace: default
+spec:
+  networkProfile:
+    # Network configuration for subnet reference
+    subnetReference: 
+      armId: /subscriptions/133d5755-4074-4d6e-ad38-eb2a6ad12903/resourceGroups/aks-secure-rg/providers/Microsoft.Network/virtualNetworks/aks-secure-vnet/subnets/aks-secure-subnet
+  location: uksouth
+  owner:
+    name: aks-secure-rg
+  dnsPrefix: aks-secure-dns
+  kubernetesVersion: "1.31"
+  
+  # Node provisioning with auto mode (NAP)
+  nodeProvisioningProfile:
+    mode: Auto
+  
+  # Identity Configuration
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+    - reference:
+        armId: /subscriptions/133d5755-4074-4d6e-ad38-eb2a6ad12903/resourceGroups/aks-secure-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/aks-secure-identity
+  
+  # AAD and RBAC Configuration
+  aadProfile:
+    enableAzureRBAC: true
+    managed: true
+    adminGroupObjectIDs:
+    - "c3917653-b066-45e1-a1ba-b0d753c0f5af"
+  enableRBAC: true
+  disableLocalAccounts: true
+  
+  # Network Profile
+  networkProfile:
+    networkPlugin: azure
+    networkPluginMode: overlay
+    networkPolicy: cilium
+    networkDataplane: cilium
+    serviceCidr: 10.41.0.0/16
+    dnsServiceIP: 10.41.0.10
+    podCidr: 10.244.0.0/16
+    ipFamilies: ["IPv4"]
+    loadBalancerSku: standard
+  
+  # API Server Access
+  apiServerAccessProfile:
+    enablePrivateCluster: false
+    enablePrivateClusterPublicFQDN: false
+  
+  agentPoolProfiles:
+  - name: sysnpl1
+    mode: System
+    count: 1
+    enableAutoScaling: false
+    vmSize: Standard_D2s_v3
+    availabilityZones: ["1"]
+    osDiskType: Managed
+    osDiskSizeGB: 128
+    osType: Linux
+    osSKU: AzureLinux
+    maxPods: 30
+  
+  # Auto Upgrade Configuration
+  autoUpgradeProfile:
+    upgradeChannel: stable
+    nodeOSUpgradeChannel: NodeImage
+  
+  # Security Profile
+  securityProfile:
+    defender:
+      securityMonitoring:
+        enabled: false
+    workloadIdentity:
+      enabled: true
+    imageCleaner:
+      enabled: true
+      intervalHours: 48
+  
+  # Storage Profile
+  storageProfile:
+    diskCSIDriver:
+      enabled: true
+    fileCSIDriver:
+      enabled: true
+    snapshotController:
+      enabled: true
+  
+  # Addon Profiles
+  addonProfiles:
+    azureKeyvaultSecretsProvider:
+      enabled: true
+      config:
+        enableSecretRotation: "true"
+        rotationPollInterval: "30m"
+    azurepolicy:
+      enabled: true
+      config:
+        version: "v2"
+  
+  # Monitoring and Metrics
+  azureMonitorProfile:
+    metrics:
+      enabled: true
+  
+  # Cluster SKU and Support
+  sku:
+    name: Base
+    tier: Free
+  supportPlan: KubernetesOfficial
+  
+  # Workload Auto Scaler with KEDA
+  workloadAutoScalerProfile:
+    keda:
+      enabled: true
+  
+  # OIDC Issuer - Required for workload identity
+  oidcIssuerProfile:
+    enabled: true
+  
+  # Resource group for node resources
+  nodeResourceGroup: MC_aks-secure-rg_aks-secure_uksouth
+  
+  # Service Principal Profile
+  servicePrincipalProfile:
+    clientId: msi
+  
+  # Tags
+  tags:
+    environment: dev
+    project: aks-secure
+    costCenter: testing
+    securityLevel: high
+    managedBy: aso

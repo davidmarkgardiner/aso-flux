@@ -1,0 +1,52 @@
+apiVersion: containerservice.azure.com/v1api20240402preview
+kind: ManagedCluster
+metadata:
+  name: cluster
+spec:
+  networkProfile:
+    subnetReference: 
+      armId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/aks-prd-rg/providers/Microsoft.Network/virtualNetworks/aks-prd-vnet/subnets/aks-prd-subnet
+    serviceCidr: 10.43.0.0/16
+    dnsServiceIP: 10.43.0.10
+    podCidr: 10.246.0.0/16
+  
+  identity:
+    type: UserAssigned
+    userAssignedIdentities:
+    - reference:
+        armId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/aks-prd-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/aks-prd-identity
+  
+  aadProfile:
+    adminGroupObjectIDs:
+    - "00000000-0000-0000-0000-000000000000"
+  
+  agentPoolProfiles:
+  - name: sysnpl1
+    vmSize: Standard_D8s_v3
+    count: 3
+    enableAutoScaling: true
+    minCount: 3
+    maxCount: 10
+  
+  nodeResourceGroup: MC_aks-prd-rg_aks-prd_eastus
+  
+  sku:
+    name: Base
+    tier: Standard
+  
+  securityProfile:
+    defender:
+      securityMonitoring:
+        enabled: true
+    workloadIdentity:
+      enabled: true
+    imageCleaner:
+      enabled: true
+      intervalHours: 24
+  
+  tags:
+    environment: prd
+    project: aks-project
+    costCenter: it-dept
+    securityLevel: high
+    managedBy: aso
