@@ -1,4 +1,4 @@
-You're outlining a solid migration strategy! Let me break down each step with specific implementation details:
+mmYou're outlining a solid migration strategy! Let me break down each step with specific implementation details:
 
 ## 1. Build New Cluster with NAP (Node Auto Provisioning)
 
